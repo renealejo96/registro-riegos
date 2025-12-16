@@ -7,11 +7,41 @@ from dotenv import load_dotenv
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 import io
+import pytz
 
 # Cargar variables de entorno
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configurar zona horaria de Ecuador
+TIMEZONE_ECUADOR = pytz.timezone('America/Guayaquil')
+
+def get_fecha_ecuador():
+    """Obtiene la fecha actual en Ecuador"""
+    return datetime.now(TIMEZONE_ECUADOR).strftime('%Y-%m-%d')
+
+def get_timestamp_ecuador():
+    """Obtiene el timestamp actual en Ecuador"""
+    return datetime.now(TIMEZONE_ECUADOR).isoformat()
+
+def convertir_a_hora_ecuador(timestamp_str):
+    """Convierte un timestamp UTC a hora de Ecuador"""
+    try:
+        # Si el timestamp ya tiene zona horaria
+        if '+' in timestamp_str or timestamp_str.endswith('Z'):
+            dt_utc = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            if dt_utc.tzinfo is None:
+                dt_utc = pytz.utc.localize(dt_utc)
+            dt_ecuador = dt_utc.astimezone(TIMEZONE_ECUADOR)
+        else:
+            # Si no tiene zona horaria, asumimos UTC
+            dt_naive = datetime.fromisoformat(timestamp_str)
+            dt_utc = pytz.utc.localize(dt_naive)
+            dt_ecuador = dt_utc.astimezone(TIMEZONE_ECUADOR)
+        return dt_ecuador.strftime('%H:%M:%S')
+    except:
+        return timestamp_str
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Configuración de Supabase
@@ -49,8 +79,22 @@ MODULOS = cargar_modulos()
 
 @app.route('/')
 def index():
-    """Página principal con el formulario de registro"""
-    return render_template('index.html', modulos=MODULOS)
+    """Página principal"""
+    # Usar fecha de Ecuador
+    fecha_ecuador = datetime.now(TIMEZONE_ECUADOR)
+    dias_espanol = {
+        'Monday': 'Lunes', 'Tuesday': 'Martes', 'Wednesday': 'Miércoles',
+        'Thursday': 'Jueves', 'Friday': 'Viernes', 'Saturday': 'Sábado', 'Sunday': 'Domingo'
+    }
+    meses_espanol = {
+        'January': 'Enero', 'February': 'Febrero', 'March': 'Marzo', 'April': 'Abril',
+        'May': 'Mayo', 'June': 'Junio', 'July': 'Julio', 'August': 'Agosto',
+        'September': 'Septiembre', 'October': 'Octubre', 'November': 'Noviembre', 'December': 'Diciembre'
+    }
+    dia = dias_espanol.get(fecha_ecuador.strftime('%A'), fecha_ecuador.strftime('%A'))
+    mes = meses_espanol.get(fecha_ecuador.strftime('%B'), fecha_ecuador.strftime('%B'))
+    fecha_formateada = f"{dia}, {fecha_ecuador.day} de {mes} de {fecha_ecuador.year}"
+    return render_template('index.html', fecha=fecha_formateada, modulos=MODULOS)
 
 
 @app.route('/registrar', methods=['POST'])
@@ -72,9 +116,9 @@ def registrar_riego():
         if not tipos_riego:
             return jsonify({'error': 'Debe seleccionar al menos un tipo de riego'}), 400
         
-        # Permitir pasar una fecha específica, sino usar la fecha actual
-        fecha = data.get('fecha', datetime.now().strftime('%Y-%m-%d'))
-        timestamp = datetime.now().isoformat()
+        # Permitir pasar una fecha específica, sino usar la fecha actual de Ecuador
+        fecha = data.get('fecha', get_fecha_ecuador())
+        timestamp = get_timestamp_ecuador()
         
         # Preparar registros para inserción
         registros = []
@@ -116,8 +160,8 @@ def registrar_riego():
 def registros_hoy():
     """Obtiene los registros del día actual o de una fecha específica"""
     try:
-        # Permitir pasar una fecha específica como parámetro
-        fecha = request.args.get('fecha', datetime.now().strftime('%Y-%m-%d'))
+        # Permitir pasar una fecha específica como parámetro, sino usar fecha de Ecuador
+        fecha = request.args.get('fecha', get_fecha_ecuador())
         
         if supabase:
             response = supabase.table('riegos')\
@@ -128,13 +172,10 @@ def registros_hoy():
             
             registros = response.data
             
-            # Formatear datos para el frontend
+            # Formatear datos para el frontend con hora de Ecuador
             registros_formateados = []
             for reg in registros:
-                try:
-                    hora = datetime.fromisoformat(reg['timestamp']).strftime('%H:%M:%S')
-                except:
-                    hora = reg['timestamp']
+                hora = convertir_a_hora_ecuador(reg['timestamp'])
                 
                 registros_formateados.append({
                     'id': reg['id'],
@@ -261,8 +302,8 @@ def estadisticas():
     """Obtiene estadísticas de riegos"""
     try:
         if supabase:
-            # Registros de hoy
-            fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+            # Registros de hoy (fecha de Ecuador)
+            fecha_hoy = get_fecha_ecuador()
             hoy = supabase.table('riegos')\
                 .select('*', count='exact')\
                 .eq('fecha', fecha_hoy)\
@@ -303,8 +344,8 @@ def resumen_semanal():
         semana = request.args.get('semana')  # formato: 2025-50
         
         if not semana:
-            # Si no se especifica, usar la semana actual
-            hoy = datetime.now()
+            # Si no se especifica, usar la semana actual de Ecuador
+            hoy = datetime.now(TIMEZONE_ECUADOR)
             year, week_num, _ = hoy.isocalendar()
             semana = f"{year}-{week_num:02d}"
         
@@ -392,7 +433,7 @@ def exportar_excel():
         semana = request.args.get('semana')
         
         if not semana:
-            hoy = datetime.now()
+            hoy = datetime.now(TIMEZONE_ECUADOR)
             year, week_num, _ = hoy.isocalendar()
             semana = f"{year}-{week_num:02d}"
         
