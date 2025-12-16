@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Riegos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-history"></i> Historial de Riegos</h1>
+            <a href="{{ url_for('index') }}" class="btn-historial">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </header>
+
+        <main>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-day"></i>
+                    <div>
+                        <h3 id="registrosHoy">0</h3>
+                        <p>Registros Hoy</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-database"></i>
+                    <div>
+                        <h3 id="totalRegistros">0</h3>
+                        <p>Total Registros</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Todos los Registros</h2>
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchHistorial" placeholder="Buscar...">
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="tablaHistorial">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Módulo</th>
+                                <th>Tipo de Riego</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historialBody">
+                            <tr>
+                                <td colspan="4" class="no-data">Cargando historial...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let todosRegistros = [];
+
+        // Cargar estadísticas
+        async function cargarEstadisticas() {
+            try {
+                const response = await fetch('/estadisticas');
+                const stats = await response.json();
+
+                document.getElementById('registrosHoy').textContent = stats.registros_hoy;
+                document.getElementById('totalRegistros').textContent = stats.total_registros;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Cargar historial completo
+        async function cargarHistorial() {
+            try {
+                const response = await fetch('/historial-completo');
+                todosRegistros = await response.json();
+
+                mostrarRegistros(todosRegistros);
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('historialBody').innerHTML = 
+                    '<tr><td colspan="4" class="no-data">Error al cargar el historial</td></tr>';
+            }
+        }
+
+        // Mostrar registros en la tabla
+        function mostrarRegistros(registros) {
+            const tbody = document.getElementById('historialBody');
+            
+            if (registros.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-data">No hay registros</td></tr>';
+            } else {
+                tbody.innerHTML = registros.map(reg => `
+                    <tr>
+                        <td>${reg.fecha}</td>
+                        <td>${reg.hora}</td>
+                        <td><span class="badge">${reg.modulo}</span></td>
+                        <td><span class="badge ${reg.tipo_riego === 'Agua' ? 'badge-agua' : 'badge-comida'}">${reg.tipo_riego}</span></td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Buscar en historial
+        document.getElementById('searchHistorial').addEventListener('input', function(e) {
+            const search = e.target.value.toLowerCase();
+            
+            const filtrados = todosRegistros.filter(reg => 
+                reg.fecha.toLowerCase().includes(search) ||
+                reg.modulo.toLowerCase().includes(search) ||
+                reg.tipo_riego.toLowerCase().includes(search)
+            );
+            
+            mostrarRegistros(filtrados);
+        });
+
+        // Cargar datos al iniciar
+        cargarEstadisticas();
+        cargarHistorial();
+
+        // Actualizar cada 30 segundos
+        setInterval(() => {
+            cargarEstadisticas();
+            cargarHistorial();
+        }, 30000);
+    </script>
+</body>
+</html>

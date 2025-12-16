@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Riegos - Finca</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-tint"></i> Registro de Riegos</h1>
+            <p class="fecha">{{ fecha }}</p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="{{ url_for('historial') }}" class="btn-historial">
+                    <i class="fas fa-history"></i> Ver Historial
+                </a>
+                <a href="{{ url_for('resumen') }}" class="btn-historial" style="background: #2196F3;">
+                    <i class="fas fa-calendar-week"></i> Resumen Semanal
+                </a>
+            </div>
+        </header>
+
+        <main>
+            <div class="card">
+                <h2>Tipo de Riego (puede seleccionar ambos)</h2>
+                <div class="tipo-riego">
+                    <label class="checkbox-card">
+                        <input type="checkbox" name="tipo_riego" value="agua" id="checkAgua">
+                        <div class="card-content">
+                            <i class="fas fa-water"></i>
+                            <span>Agua</span>
+                        </div>
+                    </label>
+                    <label class="checkbox-card">
+                        <input type="checkbox" name="tipo_riego" value="comida" id="checkComida">
+                        <div class="card-content">
+                            <i class="fas fa-seedling"></i>
+                            <span>Comida (Fertilizante)</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Seleccionar Módulos</h2>
+                </div>
+                
+                <div class="select-container">
+                    <label for="moduloInput">Seleccione o busque módulo:</label>
+                    <input type="text" id="moduloInput" placeholder="Haga clic para ver todos los módulos o escriba para buscar..." autocomplete="off">
+                    <div id="moduloDropdown" class="dropdown-list">
+                        {% for modulo in modulos %}
+                        <div class="dropdown-item" data-value="{{ modulo }}">{{ modulo }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="selected-modulos" id="selectedModulos">
+                    <p class="no-selection">No hay módulos seleccionados</p>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="limpiarModulos()">
+                        <i class="fas fa-times"></i> Limpiar Todos
+                    </button>
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="registrarRiego()">
+                <i class="fas fa-save"></i> Registrar Riego
+            </button>
+
+            <div class="card">
+                <h2>Registros de Hoy</h2>
+                <div class="table-container">
+                    <table id="tablaHoy">
+                        <thead>
+                            <tr>
+                                <th>Hora</th>
+                                <th>Módulo</th>
+                                <th>Tipo</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="registrosHoy">
+                            <tr>
+                                <td colspan="4" class="no-data">Cargando registros...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- Modal de Edición -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Registro</h3>
+                <button class="modal-close" onclick="cerrarModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="editModulo">Módulo:</label>
+                    <select id="editModulo" class="form-control">
+                        {% for modulo in modulos %}
+                        <option value="{{ modulo }}">{{ modulo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Riego (puede seleccionar ambos):</label>
+                    <div class="tipo-riego">
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="editTipoRiego" value="agua" id="editCheckAgua">
+                            <div class="card-content">
+                                <i class="fas fa-water"></i>
+                                <span>Agua</span>
+                            </div>
+                        </label>
+                        <label class="checkbox-card">
+                            <input type="checkbox" name="editTipoRiego" value="comida" id="editCheckComida">
+                            <div class="card-content">
+                                <i class="fas fa-seedling"></i>
+                                <span>Comida</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
+                <button class="btn-primary" onclick="guardarEdicion()" style="width: auto;">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Cargar fecha actual
+        const fecha = new Date().toLocaleDateString('es-ES', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        document.querySelector('.fecha').textContent = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+
+        // Gestión de módulos seleccionados
+        let modulosSeleccionados = new Set();
+
+        const moduloInput = document.getElementById('moduloInput');
+        const dropdown = document.getElementById('moduloDropdown');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+
+        console.log('Total de módulos disponibles:', dropdownItems.length);
+        console.log('Dropdown element:', dropdown);
+
+        // Función para mostrar todos los módulos
+        function mostrarTodosModulos() {
+            console.log('Mostrando todos los módulos');
+            dropdownItems.forEach(item => {
+                item.style.display = 'block';
+            });
+            dropdown.style.display = 'block';
+        }
+
+        // Mostrar dropdown al hacer click - MOSTRAR TODOS
+        moduloInput.addEventListener('click', () => {
+            console.log('Click en input, valor actual:', moduloInput.value);
+            if (moduloInput.value === '') {
+                mostrarTodosModulos();
+            } else {
+                filtrarModulos(moduloInput.value.toLowerCase());
+            }
+        });
+
+        moduloInput.addEventListener('focus', () => {
+            console.log('Focus en input');
+            if (moduloInput.value === '') {
+                mostrarTodosModulos();
+            } else {
+                filtrarModulos(moduloInput.value.toLowerCase());
+            }
+        });
+
+        // Filtrar módulos mientras escribe
+        moduloInput.addEventListener('input', function(e) {
+            const search = e.target.value.toLowerCase();
+            
+            if (search === '') {
+                mostrarTodosModulos();
+            } else {
+                filtrarModulos(search);
+            }
+        });
+
+        function filtrarModulos(search) {
+            let hasResults = false;
+            dropdownItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(search) || search === '') {
+                    item.style.display = 'block';
+                    hasResults = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            if (hasResults) {
+                dropdown.style.display = 'block';
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        // Seleccionar módulo del dropdown
+        dropdownItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const modulo = this.getAttribute('data-value');
+                agregarModulo(modulo);
+                moduloInput.value = '';
+                mostrarTodosModulos();
+                moduloInput.focus();
+            });
+        });
+
+        // Agregar módulo a la lista
+        function agregarModulo(modulo) {
+            if (!modulosSeleccionados.has(modulo)) {
+                modulosSeleccionados.add(modulo);
+                actualizarListaModulos();
+            }
+        }
+
+        // Remover módulo de la lista
+        function removerModulo(modulo) {
+            modulosSeleccionados.delete(modulo);
+            actualizarListaModulos();
+        }
+
+        // Actualizar visualización de módulos seleccionados
+        function actualizarListaModulos() {
+            const container = document.getElementById('selectedModulos');
+            
+            if (modulosSeleccionados.size === 0) {
+                container.innerHTML = '<p class="no-selection">No hay módulos seleccionados</p>';
+            } else {
+                const modulosArray = Array.from(modulosSeleccionados);
+                container.innerHTML = modulosArray.map(modulo => {
+                    return `<div class="selected-tag">
+                        <span>${modulo}</span>
+                        <button class="remove-btn" data-modulo="${modulo}" type="button">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>`;
+                }).join('');
+                
+                // Agregar event listeners a los botones de remover
+                container.querySelectorAll('.remove-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const modulo = this.getAttribute('data-modulo');
+                        removerModulo(modulo);
+                    });
+                });
+            }
+        }
+
+        // Limpiar todos los módulos
+        function limpiarModulos() {
+            modulosSeleccionados.clear();
+            actualizarListaModulos();
+        }
+
+        // Cerrar dropdown al hacer click fuera
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.select-container')) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // Prevenir que el click en el dropdown lo cierre
+        dropdown.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+
+        // Registrar riego
+        async function registrarRiego() {
+            const modulos = Array.from(modulosSeleccionados);
+            
+            const tiposRiego = Array.from(document.querySelectorAll('input[name="tipo_riego"]:checked'))
+                .map(cb => cb.value);
+
+            if (modulos.length === 0) {
+                mostrarToast('Por favor seleccione al menos un módulo', 'error');
+                return;
+            }
+
+            if (tiposRiego.length === 0) {
+                mostrarToast('Por favor seleccione al menos un tipo de riego', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/registrar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        modulos: modulos,
+                        tipos_riego: tiposRiego
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    mostrarToast(data.message, 'success');
+                    limpiarModulos();
+                    document.querySelectorAll('input[name="tipo_riego"]').forEach(cb => cb.checked = false);
+                    cargarRegistrosHoy();
+                } else {
+                    mostrarToast(data.error || 'Error al registrar', 'error');
+                }
+            } catch (error) {
+                mostrarToast('Error de conexión', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        // Cargar registros de hoy
+        async function cargarRegistrosHoy() {
+            try {
+                const response = await fetch('/registros-hoy');
+                const registros = await response.json();
+
+                const tbody = document.getElementById('registrosHoy');
+                
+                if (registros.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="no-data">No hay registros hoy</td></tr>';
+                } else {
+                    tbody.innerHTML = registros.map(reg => `
+                        <tr>
+                            <td>${reg.hora}</td>
+                            <td><span class="badge">${reg.modulo}</span></td>
+                            <td><span class="badge ${reg.tipo_riego === 'Agua' ? 'badge-agua' : 'badge-comida'}">${reg.tipo_riego}</span></td>
+                            <td>
+                                <button class="btn-edit" data-modulo="${reg.modulo}" data-fecha="${reg.fecha}" title="Editar registro">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-delete" data-id="${reg.id}" title="Eliminar registro">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    
+                    // Agregar event listeners a los botones
+                    document.querySelectorAll('.btn-edit').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const modulo = this.getAttribute('data-modulo');
+                            const fecha = this.getAttribute('data-fecha');
+                            abrirModalEditar(modulo, fecha);
+                        });
+                    });
+                    
+                    document.querySelectorAll('.btn-delete').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const id = this.getAttribute('data-id');
+                            eliminarRegistro(id);
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Eliminar registro
+        async function eliminarRegistro(id) {
+            if (!confirm('¿Está seguro de eliminar este registro?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/eliminar/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    mostrarToast(data.message, 'success');
+                    cargarRegistrosHoy();
+                } else {
+                    mostrarToast(data.error || 'Error al eliminar', 'error');
+                }
+            } catch (error) {
+                mostrarToast('Error de conexión', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        // Variables para edición
+        let registroEditandoId = null;
+
+        // Variables para edición
+        let moduloEditando = null;
+        let fechaEditando = null;
+
+        // Abrir modal de edición
+        async function abrirModalEditar(modulo, fecha) {
+            moduloEditando = modulo;
+            fechaEditando = fecha;
+            
+            document.getElementById('editModulo').value = modulo;
+            
+            // Limpiar checkboxes
+            document.getElementById('editCheckAgua').checked = false;
+            document.getElementById('editCheckComida').checked = false;
+            
+            // Cargar los tipos de riego actuales del módulo en esa fecha
+            try {
+                const response = await fetch(`/registros-hoy?fecha=${fecha}`);
+                const registros = await response.json();
+                
+                // Filtrar los registros de este módulo en esta fecha
+                const registrosModulo = registros.filter(r => r.modulo === modulo && r.fecha === fecha);
+                
+                // Marcar los tipos de riego existentes
+                registrosModulo.forEach(reg => {
+                    const tipo = reg.tipo_riego === 'Agua' ? 'agua' : 'comida';
+                    if (tipo === 'agua') {
+                        document.getElementById('editCheckAgua').checked = true;
+                    } else if (tipo === 'comida') {
+                        document.getElementById('editCheckComida').checked = true;
+                    }
+                });
+                
+                document.getElementById('editModal').style.display = 'flex';
+            } catch (error) {
+                console.error('Error al cargar tipos de riego:', error);
+                mostrarToast('Error al cargar los datos', 'error');
+            }
+        }
+
+        // Cerrar modal
+        function cerrarModal() {
+            document.getElementById('editModal').style.display = 'none';
+            moduloEditando = null;
+            fechaEditando = null;
+        }
+
+        // Guardar edición
+        async function guardarEdicion() {
+            const modulo = document.getElementById('editModulo').value;
+            const checkboxes = document.querySelectorAll('input[name="editTipoRiego"]:checked');
+            const tiposSeleccionados = Array.from(checkboxes).map(cb => cb.value);
+
+            if (tiposSeleccionados.length === 0) {
+                mostrarToast('Por favor seleccione al menos un tipo de riego', 'error');
+                return;
+            }
+
+            try {
+                // Primero, obtener todos los registros existentes del módulo en esa fecha
+                const responseGet = await fetch(`/registros-hoy?fecha=${fechaEditando}`);
+                const registros = await responseGet.json();
+                const registrosModulo = registros.filter(r => r.modulo === moduloEditando && r.fecha === fechaEditando);
+                
+                // Eliminar todos los registros existentes de este módulo en esta fecha
+                for (const reg of registrosModulo) {
+                    await fetch(`/eliminar/${reg.id}`, { method: 'DELETE' });
+                }
+                
+                // Crear nuevos registros con los tipos seleccionados
+                const responseRegistrar = await fetch('/registrar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        modulos: [modulo],
+                        tipos_riego: tiposSeleccionados,
+                        fecha: fechaEditando
+                    })
+                });
+
+                if (responseRegistrar.ok) {
+                    mostrarToast('Registro actualizado correctamente', 'success');
+                    cerrarModal();
+                    cargarRegistrosHoy();
+                } else {
+                    mostrarToast('Error al actualizar', 'error');
+                }
+            } catch (error) {
+                mostrarToast('Error de conexión', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        // Cerrar modal al hacer click fuera
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target === modal) {
+                cerrarModal();
+            }
+        }
+
+        // Mostrar toast
+        function mostrarToast(mensaje, tipo = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = mensaje;
+            toast.className = `toast show ${tipo}`;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        // Cargar registros al iniciar
+        cargarRegistrosHoy();
+
+        // Actualizar registros cada 30 segundos
+        setInterval(cargarRegistrosHoy, 30000);
+    </script>
+</body>
+</html>

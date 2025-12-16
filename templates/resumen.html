@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen Semanal - Riegos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .resumen-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .filtros {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .filtro-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filtro-group label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .week-input {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 16px;
+            min-width: 150px;
+        }
+
+        .btn-filtrar {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-filtrar:hover {
+            background: #45a049;
+        }
+
+        .btn-exportar {
+            background: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .btn-exportar:hover {
+            background: #0b7dda;
+        }
+
+        .tabla-resumen {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #4472C4;
+            color: white;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tbody tr:hover {
+            background: #f5f5f5;
+        }
+
+        .check-icon {
+            color: #4CAF50;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .cross-icon {
+            color: #f44336;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .semana-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1976d2;
+        }
+
+        .no-datos {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .nav-top {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn-back {
+            background: #666;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-back:hover {
+            background: #555;
+        }
+
+        @media (max-width: 768px) {
+            .filtro-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn-exportar {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+
+            th, td {
+                padding: 10px 8px;
+                font-size: 14px;
+            }
+
+            .semana-info {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="resumen-container">
+        <div class="nav-top">
+            <a href="/" class="btn-back">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+
+        <h1><i class="fas fa-calendar-week"></i> Resumen Semanal de Riegos</h1>
+
+        <div class="filtros">
+            <div class="filtro-group">
+                <label for="semana">Seleccionar Semana:</label>
+                <input type="week" id="semana" class="week-input">
+                <button class="btn-filtrar" onclick="cargarResumen()">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+                <button class="btn-exportar" onclick="exportarExcel()">
+                    <i class="fas fa-file-excel"></i> Exportar Excel
+                </button>
+            </div>
+        </div>
+
+        <div id="semanaInfo" class="semana-info" style="display: none;"></div>
+
+        <div class="tabla-resumen">
+            <div id="loading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> Cargando datos...
+            </div>
+
+            <table id="tablaResumen" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Semana Año</th>
+                        <th>Día</th>
+                        <th>Módulo</th>
+                        <th><i class="fas fa-tint"></i> Agua</th>
+                        <th><i class="fas fa-seedling"></i> Comida</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaBody">
+                </tbody>
+            </table>
+
+            <div id="noDatos" class="no-datos" style="display: none;">
+                <i class="fas fa-inbox" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
+                <p>No hay registros para esta semana</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let semanaActual = '';
+
+        // Establecer la semana actual al cargar
+        window.onload = function() {
+            const hoy = new Date();
+            const year = hoy.getFullYear();
+            const weekNum = getWeekNumber(hoy);
+            const semanaStr = `${year}-W${weekNum.toString().padStart(2, '0')}`;
+            document.getElementById('semana').value = semanaStr;
+            cargarResumen();
+        };
+
+        // Función para obtener el número de semana
+        function getWeekNumber(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        }
+
+        // Función para cargar el resumen
+        async function cargarResumen() {
+            const semanaInput = document.getElementById('semana').value;
+            if (!semanaInput) {
+                alert('Por favor selecciona una semana');
+                return;
+            }
+
+            // Convertir formato de input (2025-W50) a formato API (2025-50)
+            const [year, week] = semanaInput.split('-W');
+            const semana = `${year}-${week}`;
+            semanaActual = semana;
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('tablaResumen').style.display = 'none';
+            document.getElementById('noDatos').style.display = 'none';
+            document.getElementById('semanaInfo').style.display = 'none';
+
+            try {
+                const response = await fetch(`/resumen-semanal?semana=${semana}`);
+                const data = await response.json();
+
+                if (data.datos && data.datos.length > 0) {
+                    mostrarResumen(data.datos);
+                    document.getElementById('semanaInfo').textContent = `Semana ${week} del año ${year}`;
+                    document.getElementById('semanaInfo').style.display = 'block';
+                } else {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noDatos').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+                alert('Error al cargar el resumen');
+            }
+        }
+
+        // Función para mostrar el resumen
+        function mostrarResumen(datos) {
+            const tbody = document.getElementById('tablaBody');
+            tbody.innerHTML = '';
+
+            datos.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.semana}</td>
+                    <td>${item.dia}</td>
+                    <td>${item.modulo}</td>
+                    <td class="${item.agua ? 'check-icon' : 'cross-icon'}">${item.agua ? '✓' : '✗'}</td>
+                    <td class="${item.comida ? 'check-icon' : 'cross-icon'}">${item.comida ? '✓' : '✗'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('tablaResumen').style.display = 'table';
+        }
+
+        // Función para exportar a Excel
+        function exportarExcel() {
+            if (!semanaActual) {
+                alert('Por favor carga primero un resumen');
+                return;
+            }
+
+            window.location.href = `/exportar-excel?semana=${semanaActual}`;
+        }
+
+        // Traducir días al español
+        const diasEspanol = {
+            'Monday': 'Lunes',
+            'Tuesday': 'Martes',
+            'Wednesday': 'Miércoles',
+            'Thursday': 'Jueves',
+            'Friday': 'Viernes',
+            'Saturday': 'Sábado',
+            'Sunday': 'Domingo'
+        };
+    </script>
+</body>
+</html>
