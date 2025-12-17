@@ -43,6 +43,54 @@
                 </div>
             </div>
 
+            <!-- Sistema de Riego -->
+            <div class="card" id="sistemaCard" style="display: none;">
+                <h2>Sistema de Riego</h2>
+                <div class="tipo-riego">
+                    <label class="checkbox-card">
+                        <input type="radio" name="sistema_riego" value="ducha" id="sistemaDucha">
+                        <div class="card-content">
+                            <i class="fas fa-shower"></i>
+                            <span>Ducha</span>
+                        </div>
+                    </label>
+                    <label class="checkbox-card">
+                        <input type="radio" name="sistema_riego" value="goteo" id="sistemaGoteo">
+                        <div class="card-content">
+                            <i class="fas fa-tint"></i>
+                            <span>Goteo</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Tiempo de Riego -->
+            <div class="card" id="tiempoCard" style="display: none;">
+                <h2>Tiempo de Riego</h2>
+                <div class="tiempo-riego">
+                    <label class="tiempo-option">
+                        <input type="radio" name="tiempo_riego" value="5">
+                        <span>5 min</span>
+                    </label>
+                    <label class="tiempo-option">
+                        <input type="radio" name="tiempo_riego" value="7">
+                        <span>7 min</span>
+                    </label>
+                    <label class="tiempo-option">
+                        <input type="radio" name="tiempo_riego" value="10">
+                        <span>10 min</span>
+                    </label>
+                    <label class="tiempo-option">
+                        <input type="radio" name="tiempo_riego" value="14">
+                        <span>14 min</span>
+                    </label>
+                    <label class="tiempo-option">
+                        <input type="radio" name="tiempo_riego" value="15">
+                        <span>15 min</span>
+                    </label>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header">
                     <h2>Seleccionar Módulos</h2>
@@ -82,12 +130,14 @@
                                 <th>Hora</th>
                                 <th>Módulo</th>
                                 <th>Tipo</th>
+                                <th>Sistema</th>
+                                <th>Tiempo</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="registrosHoy">
                             <tr>
-                                <td colspan="4" class="no-data">Cargando registros...</td>
+                                <td colspan="6" class="no-data">Cargando registros...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -152,6 +202,49 @@
             day: 'numeric' 
         });
         document.querySelector('.fecha').textContent = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+
+        // Gestión de campos dinámicos
+        const checkAgua = document.getElementById('checkAgua');
+        const checkComida = document.getElementById('checkComida');
+        const sistemaCard = document.getElementById('sistemaCard');
+        const tiempoCard = document.getElementById('tiempoCard');
+        const sistemaDucha = document.getElementById('sistemaDucha');
+        const sistemaGoteo = document.getElementById('sistemaGoteo');
+
+        // Mostrar/ocultar campos según selección de tipo de riego
+        function actualizarCamposDinamicos() {
+            const algunoSeleccionado = checkAgua.checked || checkComida.checked;
+            
+            if (algunoSeleccionado) {
+                sistemaCard.style.display = 'block';
+            } else {
+                sistemaCard.style.display = 'none';
+                tiempoCard.style.display = 'none';
+                // Limpiar selecciones
+                document.querySelectorAll('input[name="sistema_riego"]').forEach(r => r.checked = false);
+                document.querySelectorAll('input[name="tiempo_riego"]').forEach(r => r.checked = false);
+            }
+        }
+
+        // Mostrar tiempo cuando se selecciona sistema
+        function actualizarCampoTiempo() {
+            const sistemaSeleccionado = document.querySelector('input[name="sistema_riego"]:checked');
+            
+            if (sistemaSeleccionado) {
+                tiempoCard.style.display = 'block';
+            } else {
+                tiempoCard.style.display = 'none';
+                document.querySelectorAll('input[name="tiempo_riego"]').forEach(r => r.checked = false);
+            }
+        }
+
+        // Event listeners para tipo de riego
+        checkAgua.addEventListener('change', actualizarCamposDinamicos);
+        checkComida.addEventListener('change', actualizarCamposDinamicos);
+
+        // Event listeners para sistema de riego
+        sistemaDucha.addEventListener('change', actualizarCampoTiempo);
+        sistemaGoteo.addEventListener('change', actualizarCampoTiempo);
 
         // Gestión de módulos seleccionados
         let modulosSeleccionados = new Set();
@@ -299,6 +392,9 @@
             const tiposRiego = Array.from(document.querySelectorAll('input[name="tipo_riego"]:checked'))
                 .map(cb => cb.value);
 
+            const sistemaRiego = document.querySelector('input[name="sistema_riego"]:checked')?.value;
+            const tiempoRiego = document.querySelector('input[name="tiempo_riego"]:checked')?.value;
+
             if (modulos.length === 0) {
                 mostrarToast('Por favor seleccione al menos un módulo', 'error');
                 return;
@@ -306,6 +402,16 @@
 
             if (tiposRiego.length === 0) {
                 mostrarToast('Por favor seleccione al menos un tipo de riego', 'error');
+                return;
+            }
+
+            if (!sistemaRiego) {
+                mostrarToast('Por favor seleccione el sistema de riego (Ducha o Goteo)', 'error');
+                return;
+            }
+
+            if (!tiempoRiego) {
+                mostrarToast('Por favor seleccione el tiempo de riego', 'error');
                 return;
             }
 
@@ -317,7 +423,9 @@
                     },
                     body: JSON.stringify({
                         modulos: modulos,
-                        tipos_riego: tiposRiego
+                        tipos_riego: tiposRiego,
+                        sistema_riego: sistemaRiego,
+                        tiempo_minutos: parseInt(tiempoRiego)
                     })
                 });
 
@@ -327,6 +435,10 @@
                     mostrarToast(data.message, 'success');
                     limpiarModulos();
                     document.querySelectorAll('input[name="tipo_riego"]').forEach(cb => cb.checked = false);
+                    document.querySelectorAll('input[name="sistema_riego"]').forEach(r => r.checked = false);
+                    document.querySelectorAll('input[name="tiempo_riego"]').forEach(r => r.checked = false);
+                    sistemaCard.style.display = 'none';
+                    tiempoCard.style.display = 'none';
                     cargarRegistrosHoy();
                 } else {
                     mostrarToast(data.error || 'Error al registrar', 'error');
@@ -346,13 +458,15 @@
                 const tbody = document.getElementById('registrosHoy');
                 
                 if (registros.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" class="no-data">No hay registros hoy</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="no-data">No hay registros hoy</td></tr>';
                 } else {
                     tbody.innerHTML = registros.map(reg => `
                         <tr>
                             <td>${reg.hora}</td>
                             <td><span class="badge">${reg.modulo}</span></td>
                             <td><span class="badge ${reg.tipo_riego === 'Agua' ? 'badge-agua' : 'badge-comida'}">${reg.tipo_riego}</span></td>
+                            <td><span class="badge badge-sistema">${reg.sistema_riego}</span></td>
+                            <td><span class="badge badge-tiempo">${reg.tiempo_minutos} min</span></td>
                             <td>
                                 <button class="btn-edit" data-modulo="${reg.modulo}" data-fecha="${reg.fecha}" title="Editar registro">
                                     <i class="fas fa-edit"></i>

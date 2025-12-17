@@ -106,15 +106,25 @@ def registrar_riego():
         
         modulos = data.get('modulos', [])
         tipos_riego = data.get('tipos_riego', [])
+        sistema_riego = data.get('sistema_riego')
+        tiempo_minutos = data.get('tiempo_minutos')
         
         print(f"📋 Módulos: {modulos}")
         print(f"💧 Tipos de riego: {tipos_riego}")
+        print(f"🚿 Sistema: {sistema_riego}")
+        print(f"⏱️  Tiempo: {tiempo_minutos} min")
         
         if not modulos:
             return jsonify({'error': 'Debe seleccionar al menos un módulo'}), 400
         
         if not tipos_riego:
             return jsonify({'error': 'Debe seleccionar al menos un tipo de riego'}), 400
+        
+        if not sistema_riego:
+            return jsonify({'error': 'Debe seleccionar el sistema de riego'}), 400
+        
+        if not tiempo_minutos:
+            return jsonify({'error': 'Debe seleccionar el tiempo de riego'}), 400
         
         # Permitir pasar una fecha específica, sino usar la fecha actual de Ecuador
         fecha = data.get('fecha', get_fecha_ecuador())
@@ -128,6 +138,8 @@ def registrar_riego():
                     'fecha': fecha,
                     'modulo': modulo,
                     'tipo_riego': tipo_riego,
+                    'sistema_riego': sistema_riego,
+                    'tiempo_minutos': tiempo_minutos,
                     'timestamp': timestamp
                 })
         
@@ -177,11 +189,17 @@ def registros_hoy():
             for reg in registros:
                 hora = convertir_a_hora_ecuador(reg['timestamp'])
                 
+                # Sistema y tiempo con valores por defecto para registros antiguos
+                sistema = reg.get('sistema_riego', 'N/A')
+                tiempo = reg.get('tiempo_minutos', 0)
+                
                 registros_formateados.append({
                     'id': reg['id'],
                     'hora': hora,
                     'modulo': reg['modulo'],
                     'tipo_riego': 'Agua' if reg['tipo_riego'] == 'agua' else 'Comida (Fertilizante)',
+                    'sistema_riego': 'Ducha' if sistema == 'ducha' else 'Goteo' if sistema == 'goteo' else sistema,
+                    'tiempo_minutos': tiempo,
                     'fecha': reg['fecha']  # Agregar fecha al resultado
                 })
             

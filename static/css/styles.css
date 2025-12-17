@@ -161,6 +161,48 @@ header h1 i {
     color: var(--primary-color);
 }
 
+/* Tiempo de Riego */
+.tiempo-riego {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.tiempo-option {
+    position: relative;
+    cursor: pointer;
+}
+
+.tiempo-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+}
+
+.tiempo-option span {
+    display: block;
+    padding: 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 0.75rem;
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-primary);
+    transition: all 0.3s;
+    background: white;
+}
+
+.tiempo-option input[type="radio"]:checked + span {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+    color: var(--primary-color);
+    box-shadow: var(--shadow-lg);
+}
+
+.tiempo-option:hover span {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
 /* Search Box */
 .search-box {
     position: relative;
@@ -648,6 +690,16 @@ table tbody tr:hover {
 .badge-comida {
     background: #dcfce7;
     color: #166534;
+}
+
+.badge-sistema {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-tiempo {
+    background: #f3e8ff;
+    color: #6b21a8;
 }
 
 /* Toast Notifications */
